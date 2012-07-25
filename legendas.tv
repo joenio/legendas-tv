@@ -6,25 +6,23 @@ use HTTP::Cookies;
 use WWW::Mechanize;
 use Getopt::Euclid;
 use Term::ReadPassword;
-use File::Basename;
-use File::Copy;
-use Archive::Extract ;
-use Archive::Rar ;
-use File::Find::Rule ;
-use Cwd;
 
 use constant COOKIE   => "$ENV{HOME}/.legendas.tv.cookie";
+
 use constant PT_BR => 1;
 use constant EN    => 2;
 use constant ES    => 3;
 use constant PT    => 10;
 use constant ALL   => 99;
 use constant OTHER => 100;
+
 use constant SELECT_LANG => PT_BR;
-use constant LEGENDAS_TYPE_MOVIE => 1 ;
-use constant LEGENDAS_TYPE_TV => 1 ;
-use constant TMP_EXTRACT => "/tmp/legendas/extract/" ; # Careful! should be an exclusive directory!
-use constant TMP => "/tmp/legendas/" ; # Directory to drop the compacted files from legendas.tv
+
+sub clean {
+    my $cookie = shift;
+    say ' * limpando cookie';
+    $cookie->clear;
+}
 
 my $cookie = HTTP::Cookies->new(file => COOKIE, autosave => 1);
 
@@ -34,385 +32,76 @@ $cookie->scan(sub {
       return unless $key eq 'Auth';
       $logged = ($expires > time ? 1 : 0);
 });
+
 my $browser = WWW::Mechanize->new(cookie_jar => $cookie);
+say ' * acessando legendas.tv';
+$browser->get('http://legendas.tv');
 
-starting() ;
-search_subtitle( $ARGV{'--file'} ) if defined $ARGV{'--file'} ;
-search_files( $ARGV{'--dir'} ) if defined $ARGV{'--dir'} ;
-clean_job() ;
-exit 0 ;
-
-sub starting{
-   unless ( -e TMP ){
-      mkdir ( TMP ) ;
-   }
-   unless ( -e TMP_EXTRACT ){
-      mkdir ( TMP_EXTRACT ) ;
-   }
-}
-
-sub clean_job{
-   rmdir TMP_EXTRACT ;
-   clean($cookie) if defined $ARGV{'-c'};
-}
-
-sub search_files{
-   my $d = shift ;
-   my $yes_to_all = 0 ;
-   my $option = '' ;
-
-   unless ( -d $d && -r $d ){
-      say ' * ' . $d . ' doesn\'t exist or isn\'t readable.';
-   }
-   else{
-      my @files = File::Find::Rule->file()->name( qr/\.(avi|mkv|mp4)$/i )->in( $d );
-      if ( scalar @files > 0 ){
-         say ' * ' . scalar(@files) . ' files found. ';
-
-         foreach my $file ( @files ){
-            $option = "" ;
-            if ( defined $ARGV{'-i'} ){
-               my $subtitle_file = $file ;
-               $subtitle_file =~ s/\.(avi|mkv|mp4)$//i ;
-               $subtitle_file .= ".srt" ;
-               if ( -e $subtitle_file ){
-                  say " * Ignoring file " , $file , ". Subtitle found.";
-                  next;
-               }
-            }
-
-            unless ( $yes_to_all ){
-               print "\n";
-               until ( $option =~ m/(y|n|a|q)/i ){
-                  print "   Search subtitles for (" . $file . ")? (y/n/a/q) ";
-                  chomp( $option = <STDIN> ) ;
-               }
-            }
-            else{
-               $option = "y" ;
-            }
-
-            if ( $option =~ m/a/i ){
-               $yes_to_all = 1 ;
-            }
-
-            if ( $option =~ m/y/i || $yes_to_all || $option eq '' ){
-               search_subtitle( $file ) ;
-            }
-            last if $option =~ m/q/i ;
-         }
-      }
-   }
-}
-
-sub search_subtitle{
-   my $file = shift ;
-   unless ( -e $file ){
-      say ' * ' . $file . ' doesn\'t exist.' ;
-      return 0 ;
-   }
-
-   if ( $file =~ m/\.(=?avi|mkv|mp4)$/gis ){
-      my $is_tv_series = define_subtitle_type( $file ) ;
-      my @queries = () ;
-      my $selected_file = "" ;
-
-      if ( $is_tv_series ){
-         # try to extract tv series metadata
-         my ( $series_name , $series_episode , $series_release ) = parse_tv_metadata( basename( $file ) ) ;
-         if ( defined $series_name && length $series_name > 0 ){
-            $queries[scalar @queries] = "$series_name $series_episode $series_release" ;
-            $queries[scalar @queries] = "$series_name $series_episode" ;
-         }
-      }
-      else{
-         my ( $movie_name , $movie_year , $movie_release ) = parse_movie_metadata( $file ) ;
-         if ( defined $movie_name && length $movie_name > 0 ){
-            $queries[scalar @queries] = "$movie_name $movie_year $movie_release" ;
-            $queries[scalar @queries] = "$movie_name $movie_year" ;
-            $queries[scalar @queries] = "$movie_name $movie_release" ;
-         }
-      }
-
-      say ' * Query options: ' . join( ', ' , @queries ) ;
-      foreach my $query ( @queries ){
-         $selected_file = query_engine( trim( $query ) , $is_tv_series ? LEGENDAS_TYPE_TV : LEGENDAS_TYPE_MOVIE , $file ) ;
-         if ( length $selected_file && -e $selected_file ){
-            last ;
-         }
-      }
-
-      while ( length( $selected_file ) == 0 ){
-         print "\n   Try again with another query? (y/N) " ;
-         chomp( my $response = <STDIN>) ;
-
-         if ( $response =~ /y/i ){
-            print "   Query: " ;
-            chomp( my $query = <STDIN>) ;
-            print "\n" ;
-            $selected_file = query_engine( $query , $is_tv_series ? LEGENDAS_TYPE_TV : LEGENDAS_TYPE_MOVIE , $file ) ;
-            if ( length( $selected_file ) > 0 ){
-               last ;
-            }
-         }
-         else{
-            last ;
-         }
-      }
-
-      if ( length $selected_file && -e $selected_file ){
-         $file =~ s/\.(avi|mkv|mp4)$/.srt/i ;
-         move( $selected_file , $file );
-         say " * Moving $selected_file to $file" ;
-      }
-   }
-   else{
-      say ' * ' . $file . ' is not a valid media file. Media files should have mkv, avi or mp4 extension.'
-   }
-}
-
-
-sub extract_recursively{
-   my $file = shift ;
-   my $files = shift ;
-   my @tmp_files = () ;
-
-   chdir( TMP_EXTRACT ) ; # cant set path to extract files on archive::rar... 
-   if ( $file =~ m/\.rar$/is ){
-      my $archive = new Archive::Rar( -archive => $file , -quiet => 1 ) ;
-      $archive->Extract() ;
-   }
-   else{
-      my $archive = Archive::Extract->new( archive => $file ) ;
-      $archive->extract( to => TMP_EXTRACT ) ;
-   }
-   @tmp_files = File::Find::Rule->file()->name( "*.*" )->in( TMP_EXTRACT ) ;
-   chdir( '-' ) ; # returns to my old directory
-
-   foreach my $f (@tmp_files){
-      if ( $f =~ m/\.rar$/is || $f =~ m/\.zip$/is ){
-         extract_recursively( $f , \@$files ) ;
-   }
-   unless ( $f =~ m/\.srt/is ){
-      unlink $f ;
-   }
-   else{
-      @$files[scalar @$files] = $f ;
-   }
-}
-}
-
-sub handle_archive{
-   my $archive = shift ;
-   my $media_file = shift ;
-   my @files = () ;
-   my $selected = "" ;
-
-   foreach my $file (@$archive){
-      extract_recursively( $file , \@files ) ;
-}
-
-$media_file = basename( $media_file ) ;
-$media_file =~ s/\.(avi|mp4|mkv)$//gis ;
-$media_file =~ s/\./ /gis ;
-
-my $index = 0 ;
-if ( $#files > 1 ){
-   say ' * ' ;
-   say ' * Searching' ;
-
-   while ( 1 ){
-      print "\n" ;
-      my $suggestion_index = -1 ;
-      for my $index (0..$#files ){
-         my $suggestion = "  $index  " ;
-         my $comp_file = basename( $files[$index] ) ;
-         $comp_file =~ s/\.[a-z]+$//gis ;
-         $comp_file =~ s/\./ /gis ;
-
-         if ( lc $media_file eq lc $comp_file && $suggestion_index == -1 ){
-            $suggestion = " *" . $index . "* " ;
-            $suggestion_index = $index ;
-         }
-         say $suggestion , basename( $files[$index] ) ;
-      }
-
-      if ( $suggestion_index > -1 ){
-         print "\n   " . $#files . " files found; choose the appropriate file number or <enter> to suggested file: " ;
-      }
-      else{
-         print "\n   " . $#files . " files found; choose the appropriate file number: " ;
-      }
-
-      chomp($index = <STDIN>) ;
-      print "\n" ;
-      if ( $index eq "" && $suggestion_index > -1 ){
-         $index = $suggestion_index ;
-      }
-
-      unless ( $index =~ m/[0-9]+/is && defined $files[$index] ){
-         print "   Abort? (Y/n)\n" ;
-         chomp($index = <STDIN>) ;
-         print "\n" ;
-         if ( $index eq "" || $index =~ m/y/i ){
-            last ;
-         }
-      }
-      else{
-         last ;
-      }
-   }
-}
-
-$selected = $files[$index] if $index =~ m/[0-9]+/is && defined $files[$index] ;
-foreach my $file ( @files ){
-   unlink $file if ( $selected ne $file ) ;
-}
-$selected = $selected if length $selected ;
-return $selected ;
-}
-
-sub query_engine{
-   my $query = shift ;
-   my $media_type = shift ;
-   my $file = shift ;
-
-   return if length $query == 0 ;
-
-   authenticate() ;
-   say " * Querying $query";
+unless ($logged) {
+   say ' * entre com seu login e senha';
+   print '   login: '; chomp(my $LOGIN = <STDIN>);
+   my $PASSWORD = read_password('   senha: ');
+   say ' * logando';
    $browser->submit_form(
       form_name   => 'form1',
       form_number => 1,
-      fields      => { txtLegenda => $query, selTipo => $media_type , int_idioma => SELECT_LANG },
-      button      => 'btn_buscar',
+      fields      => { txtLogin => $LOGIN, txtSenha => $PASSWORD, chkLogin => 1 },
+      button      => 'entrar',
    );
+   $browser->follow_link( text_regex => qr/clique aqui caso/i );
+}
 
-   my $result = $browser->content;
+say " * pesquisando $ARGV{'<filme>'}";
+$browser->submit_form(
+   form_name   => 'form1',
+   form_number => 1,
+   fields      => { txtLegenda => $ARGV{'<filme>'}, selTipo => 1, int_idioma => SELECT_LANG },
+   button      => 'btn_buscar',
+);
 
-   my @film = ();
-   while ($result =~ m/<span onmouseover.*?gpop\('([^']+)','([^']+)','([^']+)','(\d+)','\d+','(\d+MB)',.*?abredown\('(\w+)'\)/sigo) {
-      push @film, {filme => $1, descricao => $2, release => $3, cds => $4, size => $5, id => $6};
-   }
+my $result = $browser->content;
 
-   unless (@film > 0) {
-      say " * no subtitle found!";
-      return "" ;
-   }
+my @film = ();
+while ($result =~ m/<span onmouseover.*?gpop\('([^']+)','([^']+)','([^']+)','(\d+)','\d+','(\d+MB)',.*?abredown\('(\w+)'\)/sigo) {
+   push @film, {filme => $1, descricao => $2, release => $3, cds => $4, size => $5, id => $6};
+}
 
-   my @archives = () ;
+if (@film > 0) {
+   say " * ", scalar(@film), " legenda(s) encontrada(s)";
+}
+else {
+   say " * nenhuma legenda encontrada!";
+   clean($cookie) if defined $ARGV{'-c'};
+   exit -1;
+}
+
+my $response = 's';
+while ($response eq 's') {
    for my $index (0 .. $#film) {
-      $browser->get("http://legendas.tv/info.php?d=$film[$index]->{id}&c=1") ;
-      $browser->save_content( TMP . $browser->response->filename );
-      $archives[$index] = TMP . $browser->response->filename ;
+      my $n = $index + 1;
+      say "\n ", $n, " $film[$index]->{release}";
+      say "   $film[$index]->{filme} - $film[$index]->{descricao}";
+      say "   tamanho: $film[$index]->{size}, cds: $film[$index]->{cds}";
    }
 
-   while ( 1 ){
-      my $selected_file = handle_archive( \@archives , $file ) ;
-   if ( $selected_file ne '' ){
-      print "   Is this the correct subtitle ($selected_file)? (Y/n)";
-      chomp( my $n = <STDIN> );
-      print "\n" ;
+   print "\n   Selecione uma legenda para baixar: (q para sair) ";
+   chomp(my $n = <STDIN>);
+   last if $n eq 'q';
+   my $index = $n - 1;
 
-      if ( $n =~ m/n/i ){
-         next ;
-      }
-   }
-   else{
-      say " * no subtitle found!";
-   }
-   foreach my $archive (@archives){
-      unlink $archive ;
-   }
-   return $selected_file ;
-}
+   say "\n * baixando legenda $film[$index]->{release}";
+   $browser->get("http://legendas.tv/info.php?d=$film[$index]->{id}&c=1");
+
+   say ' * arquivo ' . $browser->response->filename . ' salvo';
+   $browser->save_content('./'. $browser->response->filename);
+
+   print "\n   baixar outra legenda? (s/n)";
+   chomp($response = <STDIN>);
 }
 
-sub parse_tv_metadata{
-   my $filename = shift ;
-   my $name = "" ;
-   my $episode = "" ;
-   my $release = "" ;
+clean($cookie) if defined $ARGV{'-c'};
 
-   if ( $filename =~ m/(.+)[\.\s](s[0-9][0-9]e[0-9][0-9]).+/gis ){
-      $name = $1 ;
-      $episode = $2 ;
-   }
-   if ( $filename =~ m/[-\.]([a-z]+)\.[^\.]+$/is ){
-      $release = $1 ;
-   }
-   return ( $name , $episode , $release ) ;
-}
-
-sub parse_movie_metadata{
-   my $file = shift ;
-   $file =~ s/\.(=?avi|mkv|mp4)//gis ; # remove file extension
-   my $filename = basename( $file ) ;
-   my $name = "" ;
-   my $year = "" ;
-   my $release = "" ;
-
-   if ( $filename =~ m/(.+[\s\.])+\(?([1-2][0-9][0-9][0-9])\)?/gis ){ # get everything until movie year is found
-      $name = $1 ;
-      $year = $2 ;
-   }
-   elsif ( $filename =~ m/(.+[\s\.])+(?=720p|1080p|DVDrip|HDrip|BRrip|BDrip)/gis ){ # get everything until movie year is found
-      # if the movie doesn't have a year, then it should have the format, perhaps
-      $name = $1 ;
-   }
-
-   $name =~ s/\.$//is ;
-   $name =~ s/\./ /is ;
-
-   if ( $filename =~ m/[\-\.]([a-z]+)$/gis ){
-      $release = $1 ;
-   }
-
-   unless ( length $name ){
-      $file =~ s/$filename//gis ;
-      if ( $file =~ m/\/(.+?)\/$/gis ){
-         return parse_movie_metadata( $1 ) ;
-      }
-   }
-   return ( $name , $year , $release ) ;
-}
-
-sub define_subtitle_type{
-   my $filename = shift ;
-   return $filename =~ m/.*s[0-9][0-9]e[0-9][0-9].*/gis ; # tv series commom signature
-}
-
-sub clean{
-   my $cookie = shift;
-   say ' * limpando cookie';
-   $cookie->clear;
-}
-
-sub authenticate{
-   $browser->get('http://legendas.tv');
-
-   unless ($logged) {
-      say ' * Acessing legendas.tv';
-      say '\n   Entre com seu login e senha';
-      print '   login: '; chomp(my $LOGIN = <STDIN>);
-      my $PASSWORD = read_password('   senha: ');
-      say ' * logando';
-      $browser->submit_form(
-         form_name   => 'form1',
-         form_number => 1,
-         fields      => { txtLogin => $LOGIN, txtSenha => $PASSWORD, chkLogin => 1 },
-         button      => 'entrar',
-      );
-      $browser->follow_link( text_regex => qr/clique aqui caso/i );
-   }
-}
-
-sub trim{
-   my $s = shift ;
-   $s =~ s/^\s+//gis ;
-   $s =~ s/\s+$//gis ;
-   return $s ;
-}
+exit 0;
 
 __END__
 
@@ -432,40 +121,22 @@ legendas.tv <filme> [options]
 
 =over
 
-=back
-
-=head1 OPTIONS
-
-=over
-
-=item -f <filme>
+=item <filme>
 
 Nome do filme
 
 =for Euclid
    filme.type: string, length(filme) > 2
 
-=item --file <file>
+=back
 
-Nome do arquivo
+=head1 OPTIONS
 
-=for Euclid
-   file.type: string, length(file) > 2
-
-=item --dir <dir>
-
-Nome do diretorio
-
-=for Euclid
-   dir.type: string, length(dir) > 2
+=over
 
 =item -c
 
 Limpa o cache
-
-=item -i
-
-Ignora arquivos que ja possuem legenda
 
 =back
 
