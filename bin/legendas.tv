@@ -1,0 +1,44 @@
+#!/usr/bin/perl
+use strict;
+use LegendasTV;
+
+=head1 NAME
+
+legendas.tv - pesquisa e baixa legendas do site legendas.tv
+
+=head1 USAGE
+
+legendas.tv <filme> [options]
+
+=head1 COMMANDS
+
+To see a list of all available commands run:
+
+   legendas.tv commands
+
+=head1 DEPENDENCIES
+
+L<HTTP::Cookies>,
+L<WWW::Mechanize>,
+L<Getopt::Euclid>,
+L<Term::ReadPassword>
+
+=head1 TODO
+
+Exibir legendas das proximas paginas quando houver paginação
+
+=head1 AUTHOR
+
+Joenio Costa <joenio@colivre.coop.br>
+
+=head1 COPYRIGHT
+
+Copyright (c) 2008-2012, Joenio Costa. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License version 3 as
+published by the Free Software Foundation.
+
+=cut
+
+LegendasTV->run();
