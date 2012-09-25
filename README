@@ -1,0 +1,17 @@
+README
+======
+
+legendas.tv - search and download subtitles from legendas.tv site
+
+TODO
+====
+
+Documentar e empacotar dependencias faltando no Debian:
+
+apt-get install libterm-readpassword-perl
+apt-get install rar
+
+Documentar instalacao de dependencias diretamente pelo cpan, maneira simples e facil
+para não usuários Debian:
+
+curl -L cpanmin.us | perl - -n Archive::Rar
