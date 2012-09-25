@@ -6,26 +6,11 @@ use LegendasTV;
 
 legendas.tv - pesquisa e baixa legendas do site legendas.tv
 
-=head1 USAGE
-
-legendas.tv <filme> [options]
-
 =head1 COMMANDS
 
 To see a list of all available commands run:
 
    legendas.tv commands
-
-=head1 DEPENDENCIES
-
-L<HTTP::Cookies>,
-L<WWW::Mechanize>,
-L<Getopt::Euclid>,
-L<Term::ReadPassword>
-
-=head1 TODO
-
-Exibir legendas das proximas paginas quando houver paginação
 
 =head1 AUTHOR
 

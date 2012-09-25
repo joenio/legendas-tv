@@ -4,6 +4,12 @@ use Modern::Perl;
 extends qw(MooseX::App::Cmd::Command);
 # ABSTRACT: power search engine (experimental)
 
+=head1 NAME
+
+LegendasTV::Command::psearch - power search engine (experimental)
+
+=cut
+
 with 'LegendasTV::Roles::CommonParams';
 
 use File::Basename;
@@ -441,6 +447,14 @@ sub trim {
 =head1 AUTHOR
 
 Fernando Nemec <fernando.nemec@grupofolha.com.br>
+
+=head1 COPYRIGHT
+
+Copyright (c) 2012, Fernando Nemec. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License version 3 as
+published by the Free Software Foundation.
 
 =cut
 

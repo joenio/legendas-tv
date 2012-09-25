@@ -7,7 +7,7 @@ use Term::ReadPassword;
 extends qw(MooseX::App::Cmd);
 # ABSTRACT: Base class for all commands
 
-use constant COOKIE   => "$ENV{HOME}/.legendas.tv.cookie";
+use constant COOKIE => "$ENV{HOME}/.legendas.tv.cookie";
 
 has ua => (
    isa => 'WWW::Mechanize',
@@ -46,7 +46,27 @@ sub _login {
    return $ua;
 }
 
-# TODO
-# alertar sobre usuario ou senha incorretos ao logar
+=head1 NAME
+
+LegendasTV - MooseX::App::Cmd base class
+
+=head1 DESCRIPTION
+
+LegendasTV provides a interface for http://legendas.tv site, a Brazilian
+site for subtitles download.
+
+=head1 AUTHOR
+
+Joenio Costa <joenio@colivre.coop.br>
+
+=head1 COPYRIGHT
+
+Copyright (c) 2008-2012, Joenio Costa. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License version 3 as
+published by the Free Software Foundation.
+
+=cut
 
 1;

@@ -4,6 +4,12 @@ use Modern::Perl;
 extends qw(MooseX::App::Cmd::Command);
 # ABSTRACT: default search engine
 
+=head1 NAME
+
+LegendasTV::Command::search - default search engine
+
+=cut
+
 with 'LegendasTV::Roles::CommonParams';
 
 has string => (
@@ -57,5 +63,19 @@ sub execute {
       chomp($response = <STDIN>);
    }
 }
+
+=head1 AUTHOR
+
+Joenio Costa <joenio@colivre.coop.br>
+
+=head1 COPYRIGHT
+
+Copyright (c) 2008-2012, Joenio Costa. All Rights Reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License version 3 as
+published by the Free Software Foundation.
+
+=cut
 
 1;
