@@ -4,12 +4,7 @@ use Modern::Perl;
 extends qw(MooseX::App::Cmd::Command);
 # ABSTRACT: default search engine
 
-use constant PT_BR => 1;
-use constant EN    => 2;
-use constant ES    => 3;
-use constant PT    => 10;
-use constant ALL   => 99;
-use constant OTHER => 100;
+with 'LegendasTV::Roles::CommonParams';
 
 has string => (
    traits => [qw(Getopt)],
@@ -18,15 +13,6 @@ has string => (
    cmd_aliases   => 's',
    documentation => 'name of the movie to search',
    required => 1,
-);
-
-has lang => (
-   traits => [qw(Getopt)],
-   isa => 'Int',
-   is  => 'rw',
-   cmd_aliases   => 'l',
-   documentation => 'language of subtitle to search',
-   default => PT_BR,
 );
 
 sub execute {
