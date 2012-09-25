@@ -1,0 +1,33 @@
+#!/usr/bin/perl
+@deps = qw(
+   Archive::Extract
+   Archive::Rar
+   ExtUtils::MakeMaker
+   File::Basename
+   File::Copy
+   File::Find::Rule
+   HTTP::Cookies
+   Modern::Perl
+   Moose
+   MooseX::App::Cmd
+   Term::ReadPassword
+   WWW::Mechanize
+   Dist::Zilla
+   Dist::Zilla::Plugin::VersionFromModule
+);
+
+foreach $mod (@deps) {
+   eval "use $mod;";
+   if ($@ && $@ =~ /Can.t locate.+?\@INC/) {
+      push @missing, $mod;
+   }
+}
+
+if (@missing > 0) {
+   `curl -L cpanmin.us | perl - -n @missing`;
+}
+
+chdir '/tmp';
+`curl -L gitorious.org/legendas-tv/legendas-tv/archive-tarball/master | tar -zxvf -`;
+chdir 'legendas-tv-legendas-tv/';
+`dzil install`;
