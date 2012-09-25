@@ -3,6 +3,15 @@ README
 
 legendas.tv - search and download subtitles from legendas.tv site
 
+EXAMPLES
+========
+
+$ legendas.tv search -s 'Star Wars'
+
+$ legendas.tv psearch --dir /tmp/folder --file /movies/file.avi
+
+$ legendas.tv logout
+
 TODO
 ====
 
