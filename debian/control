@@ -1,0 +1,23 @@
+Source: legendas-tv
+Section: perl
+Priority: optional
+Maintainer: Debian Perl Group <pkg-perl-maintainers@lists.alioth.debian.org>
+Uploaders: Joenio Costa <joenio@colivre.coop.br>
+Build-Depends: debhelper (>= 8)
+Build-Depends-Indep: libmodern-perl-perl,
+ libmoose-perl,
+ libmoosex-app-cmd-perl
+Standards-Version: 3.9.3
+Homepage: http://search.cpan.org/dist/LegendasTV/
+
+Package: legendas-tv
+Architecture: all
+Depends: ${misc:Depends}, ${perl:Depends},
+ libmodern-perl-perl,
+ libmoose-perl,
+ libfile-find-rule-perl,
+ libterm-readpassword-perl,
+ libwww-mechanize-perl,
+ libmoosex-app-cmd-perl,
+ libarchive-rar-perl
+Description: search and download subtitles from legendas.tv site via command line

@@ -3,6 +3,18 @@ README
 
 legendas.tv - search and download subtitles from legendas.tv site
 
+INSTALL
+=======
+
+Add to /etc/apt/sources.list
+
+deb http://sede.colivre.coop.br/~joenio/debian/ ./
+
+And run
+
+# apt-get update
+# apt-get install legendas-tv
+
 EXAMPLES
 ========
 
@@ -15,12 +27,13 @@ $ legendas.tv logout
 TODO
 ====
 
-Documentar e empacotar dependencias faltando no Debian:
+Create Debian packages for:
 
-apt-get install libterm-readpassword-perl
-apt-get install rar
+* Archive::Rar
 
-Documentar instalacao de dependencias diretamente pelo cpan, maneira simples e facil
-para não usuários Debian:
+HACKING
+=======
 
-curl -L cpanmin.us | perl - -n Archive::Rar
+Building debian package
+
+$ dzil debuild
